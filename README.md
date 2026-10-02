@@ -633,7 +633,7 @@ Future improvements:
 
 # Author
 
-Wazuh openSUSE Deployment Project
+Beanie Berlingham
 
 
 ---
