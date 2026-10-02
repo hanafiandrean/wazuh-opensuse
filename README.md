@@ -1,60 +1,49 @@
-# Wazuh All-in-One Installation on openSUSE Leap 16
+# Wazuh All-in-One Installer for openSUSE Leap 16
 
-![OS](https://img.shields.io/badge/OS-openSUSE%20Leap%2016-green)
-![Wazuh](https://img.shields.io/badge/Wazuh-4.14-blue)
-![License](https://img.shields.io/badge/license-MIT-lightgrey)
+Repository ini menyediakan installer **Wazuh All-in-One** untuk **openSUSE Leap 16** dengan dua metode deployment:
 
-Automatic installation and configuration of **Wazuh All-in-One** on **openSUSE Leap 16**.
+1. **Ansible Playbook**
+2. **Shell Script Installer**
 
-This repository provides two installation methods:
+Wazuh secara resmi lebih banyak digunakan pada distribusi Linux seperti RHEL-based dan Debian-based. Karena itu, instalasi pada openSUSE membutuhkan beberapa penyesuaian compatibility agar komponen Wazuh dapat berjalan dengan baik.
 
-1. **Ansible Playbook Installation**
-2. **Manual Shell Script Installation**
+Repository ini menyediakan dua pendekatan dengan tujuan berbeda:
 
-The purpose of this project is to simplify Wazuh deployment on openSUSE, because Wazuh officially focuses on distributions such as RHEL-based and Debian-based operating systems.
+- **Ansible Playbook** → automation dan deployment terstruktur
+- **Shell Script** → compatibility workaround dan instalasi langsung
+
 
 ---
 
-# Overview
+# Wazuh Components Installed
 
-Wazuh is an open-source security monitoring platform that provides:
-
-- Security Information and Event Management (SIEM)
-- Intrusion Detection
-- File Integrity Monitoring
-- Vulnerability Detection
-- Log Analysis
-- Endpoint Monitoring
-- Compliance Monitoring
-
-
-This repository installs the complete Wazuh stack:
+Kedua installer akan melakukan deployment komponen:
 
 ```
-+-----------------------+
-|   Wazuh Dashboard     |
-|      HTTPS :443       |
-+-----------+-----------+
-            |
-            |
-+-----------v-----------+
-|   Wazuh Indexer       |
-|     OpenSearch        |
-|       :9200           |
-+-----------+-----------+
-            |
-            |
-+-----------v-----------+
-|   Wazuh Manager       |
-|       :1514           |
-+-----------+-----------+
-            |
-            |
-+-----------v-----------+
-|     Filebeat          |
-| Log Forwarder         |
-+-----------------------+
++----------------------+
+| Wazuh Dashboard      |
+| HTTPS :443           |
++----------+-----------+
+           |
+           |
++----------v-----------+
+| Wazuh Indexer        |
+| OpenSearch :9200     |
++----------+-----------+
+           |
+           |
++----------v-----------+
+| Wazuh Manager        |
+| Agent Communication  |
++----------+-----------+
+           |
+           |
++----------v-----------+
+| Filebeat             |
+| Log Forwarder        |
++----------------------+
 ```
+
 
 ---
 
@@ -63,25 +52,15 @@ This repository installs the complete Wazuh stack:
 ```
 .
 ├── install_wazuh_full_opensuse.yml
-│
 ├── install-wazuh.sh
-│
 └── README.md
 ```
-
-Description:
-
-| File | Description |
-|-|-|
-| `install_wazuh_full_opensuse.yml` | Automated Ansible installer |
-| `install-wazuh.sh` | Manual installation script |
-| `README.md` | Documentation |
 
 ---
 
 # Installation Methods
 
-## Method 1 - Ansible Playbook (Recommended)
+## 1. Ansible Playbook
 
 File:
 
@@ -89,91 +68,50 @@ File:
 install_wazuh_full_opensuse.yml
 ```
 
-## Description
+## Overview
 
-The Ansible playbook automates the complete Wazuh installation process.
+Metode ini menggunakan Ansible untuk melakukan instalasi Wazuh secara otomatis.
 
-The playbook handles:
+Playbook melakukan:
 
-- Removing previous Wazuh installation
-- Installing dependencies
-- Adding Wazuh repository
-- Configuring openSUSE compatibility
-- Setting kernel parameters
-- Configuring firewall
-- Installing Wazuh All-in-One
-- Configuring administrator credentials
-- Checking service status
-
-
----
-
-## Features
-
-### Automatic Cleanup
-
-Before installation, old Wazuh components are removed:
-
-```
-wazuh-indexer
-wazuh-manager
-wazuh-dashboard
-filebeat
-```
-
-This prevents conflicts from previous failed installations.
+- Menghentikan service Wazuh lama
+- Menghapus instalasi sebelumnya
+- Membersihkan konfigurasi lama
+- Install dependency openSUSE
+- Konfigurasi repository
+- Menyesuaikan environment RPM
+- Konfigurasi kernel parameter
+- Membuka firewall
+- Menjalankan installer Wazuh
+- Konfigurasi password administrator
+- Melakukan pengecekan service
 
 
-### Dependency Installation
+## Kelebihan
 
-Required packages:
+✅ Automation penuh
 
-```
-curl
-bash
-openssl
-python3
-sudo
-firewalld
-rpm-build
-libcap
-```
+✅ Deployment dapat diulang
 
----
+✅ Konfigurasi terdokumentasi dalam bentuk code
 
-### Kernel Optimization
+✅ Cocok untuk beberapa server
 
-The playbook configures:
+✅ Maintenance lebih mudah
 
-```
-vm.max_map_count=262144
-```
 
-Required by Wazuh Indexer/OpenSearch.
+## Kekurangan
+
+❌ Masih bergantung pada installer resmi Wazuh
+
+❌ Compatibility fix lebih terbatas
+
+❌ Jika installer utama gagal, debugging lebih kompleks
 
 
 ---
 
-### Automatic Deployment
-
-Installation process:
-
-```
-openSUSE
-    |
-    |
-Ansible Playbook
-    |
-    |
-Wazuh Installer
-    |
-    |
-Wazuh All-in-One
-```
-
----
-
-# Method 2 - Manual Shell Script
+# 2. Shell Script Installer
 
 File:
 
@@ -181,183 +119,187 @@ File:
 install-wazuh.sh
 ```
 
----
+## Overview
 
-## Description
+Metode ini melakukan instalasi Wazuh secara langsung menggunakan shell script dengan beberapa compatibility adjustment khusus openSUSE.
 
-The shell script installs Wazuh components manually step-by-step.
+Script melakukan:
 
-Installed components:
+- Membuat compatibility file systemd
+- Konfigurasi kernel
+- Menambahkan repository Wazuh
+- Install Java 21
+- Install Wazuh Indexer
+- Install Wazuh Manager
+- Install Filebeat
+- Install Dashboard
+- Generate certificate
+- Konfigurasi service
 
-```
-wazuh-indexer
-wazuh-manager
-filebeat
-wazuh-dashboard
-```
 
----
+## Compatibility Fix
 
-## Features
+Script ini memiliki beberapa workaround agar Wazuh dapat berjalan pada openSUSE:
 
-### openSUSE Compatibility Fix
+### Systemd Compatibility
 
-Creates required systemd compatibility:
-
-```
-systemd-sysv-install
-```
-
----
-
-### Java Installation
-
-Installs:
+Membuat:
 
 ```
-Java 21 OpenJDK
+/usr/lib/systemd/systemd-sysv-install
 ```
 
-and configures Wazuh Indexer Java environment.
 
----
+### RPM Dependency Bypass
 
-### Certificate Generation
-
-Automatically generates:
+Dashboard menggunakan:
 
 ```
-root-ca.pem
-indexer.pem
-dashboard.pem
-filebeat.pem
+rpm -ivh --nodeps
 ```
 
-for secure communication.
+untuk melewati dependency package yang berbeda antara openSUSE dan distribusi RPM lainnya.
 
----
 
-### Dashboard Installation
+### Java Compatibility
 
-Installs Wazuh Dashboard RPM manually.
+Menggunakan Java sistem:
+
+```
+java-21-openjdk
+```
+
+untuk Wazuh Indexer.
+
+
+## Kelebihan
+
+✅ Lebih cocok untuk openSUSE
+
+✅ Memiliki compatibility workaround lebih lengkap
+
+✅ Tidak bergantung penuh pada installer all-in-one
+
+✅ Lebih mudah troubleshooting karena proses terlihat tahap demi tahap
+
+
+## Kekurangan
+
+❌ Tidak sefleksibel Ansible
+
+❌ Kurang cocok untuk deployment banyak server
+
+❌ Perlu perhatian saat upgrade versi Wazuh
+
 
 ---
 
 # Comparison
 
-| Feature | Ansible | Shell Script |
-|-|-|-|
-| Installation automation | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Easy deployment | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| Feature | Ansible (.yml) | Shell Script (.sh) |
+|---|---|---|
+| Automation | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
+| OpenSUSE compatibility | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
 | Troubleshooting | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+| Deployment banyak server | ⭐⭐⭐⭐⭐ | ⭐⭐ |
 | Maintenance | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Production usage | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ |
-| Development/testing | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-| Repeatability | ⭐⭐⭐⭐⭐ | ⭐⭐ |
+| Dependency bypass | ❌ | ✅ |
+| Manual control | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+
 
 ---
 
 # Recommendation
 
-## Recommended: Ansible Playbook
+## Recommended for openSUSE Leap 16
 
-The recommended installation method is:
-
-```
-install_wazuh_full_opensuse.yml
-```
-
-Reasons:
-
-### 1. Better Maintainability
-
-Configuration is stored as code and can be reused.
-
-
-### 2. Reproducible Deployment
-
-The same installation process can be repeated on multiple servers.
-
-
-### 3. Cleaner Installation
-
-The playbook removes previous Wazuh installation before deployment.
-
-
-### 4. Suitable for Long-Term Usage
-
-Better choice for:
-
-- Campus server
-- Company monitoring server
-- Security laboratory
-- Production environment
-
-
----
-
-# When to Use Shell Script?
-
-Use:
+Untuk instalasi pertama pada openSUSE Leap 16:
 
 ```
 install-wazuh.sh
 ```
 
-for:
-
-- Testing
-- Learning
-- Debugging
-- Development
+lebih direkomendasikan.
 
 
-Advantages:
+Alasan:
 
-- Easier to understand step-by-step
-- Easier to modify manually
-- Easier to troubleshoot failed components
+- openSUSE membutuhkan beberapa compatibility workaround
+- script melakukan bypass dependency yang biasanya menjadi masalah
+- instalasi komponen dilakukan secara langsung
+- lebih mudah menemukan error ketika instalasi gagal
 
 
 ---
 
-# System Requirements
+## Recommended for Deployment Management
 
-Recommended minimum specification:
+Gunakan:
+
+```
+install_wazuh_full_opensuse.yml
+```
+
+apabila:
+
+- server sudah berhasil diuji
+- ingin deployment berulang
+- ingin menggunakan automation
+- mengelola banyak host
+
+
+Workflow yang disarankan:
+
+```
+Testing / Initial Installation
+            |
+            v
+ install-wazuh.sh
+            |
+            v
+ Verify Wazuh Works
+            |
+            v
+ Convert Deployment
+            |
+            v
+ Ansible Playbook
+```
+
+---
+
+# Requirements
+
+Minimum:
 
 | Component | Requirement |
 |-|-|
-| Operating System | openSUSE Leap 16 |
+| OS | openSUSE Leap 16 |
 | CPU | 4 Core |
 | RAM | 8 GB |
 | Storage | 50 GB |
-| Java | OpenJDK 21 |
+| Architecture | x86_64 |
 | Internet | Required |
-| Privilege | Root access |
+| Access | Root privilege |
 
 
 ---
 
-# Required Ports
+# Running Installation
 
-Open firewall ports:
 
-| Port | Service |
-|-|-|
-| 443/TCP | Wazuh Dashboard |
-| 1514/TCP | Wazuh Agent Communication |
-| 1515/TCP | Agent Enrollment |
-| 55000/TCP | Wazuh API |
-| 9200/TCP | Wazuh Indexer |
+## Option 1 - Shell Script
+
+```bash
+chmod +x install-wazuh.sh
+
+sudo ./install-wazuh.sh
+```
 
 
 ---
 
-# Installation Guide
-
-
-## Option 1 - Using Ansible
-
+## Option 2 - Ansible
 
 Install Ansible:
 
@@ -366,7 +308,7 @@ sudo zypper install ansible
 ```
 
 
-Run playbook:
+Run:
 
 ```bash
 ansible-playbook install_wazuh_full_opensuse.yml
@@ -375,27 +317,29 @@ ansible-playbook install_wazuh_full_opensuse.yml
 
 ---
 
-## Option 2 - Using Shell Script
+# Default Dashboard Access
 
+After successful installation:
 
-Give permission:
-
-```bash
-chmod +x install-wazuh.sh
+```
+URL:
+https://SERVER-IP
 ```
 
+Default credential:
 
-Run installer:
+```
+Username:
+admin
 
-```bash
-sudo ./install-wazuh.sh
+Password:
+admin
 ```
 
 
 ---
 
 # Service Verification
-
 
 Check Wazuh services:
 
@@ -409,35 +353,11 @@ systemctl status wazuh-dashboard
 systemctl status filebeat
 ```
 
-Expected result:
+
+Expected:
 
 ```
 active (running)
-```
-
----
-
-# Dashboard Access
-
-
-After successful installation:
-
-
-```
-URL:
-https://SERVER-IP
-```
-
-
-Default credential:
-
-```
-Username:
-admin
-
-
-Password:
-admin12345
 ```
 
 
@@ -445,25 +365,31 @@ admin12345
 
 # Troubleshooting
 
-
-## Check Indexer
+## Indexer Problem
 
 ```bash
-journalctl -u wazuh-indexer -n 100
+journalctl -u wazuh-indexer
 ```
 
 
-## Check Manager
+## Manager Problem
 
 ```bash
-journalctl -u wazuh-manager -n 100
+journalctl -u wazuh-manager
 ```
 
 
-## Check Dashboard
+## Dashboard Problem
 
 ```bash
-journalctl -u wazuh-dashboard -n 100
+journalctl -u wazuh-dashboard
+```
+
+
+## Filebeat Problem
+
+```bash
+journalctl -u filebeat
 ```
 
 
@@ -471,53 +397,40 @@ journalctl -u wazuh-dashboard -n 100
 
 # Known Limitations
 
-- Wazuh is not officially optimized for openSUSE.
-- Some compatibility adjustments are required.
-- Future Wazuh updates may require script modifications.
-- Testing is recommended before production deployment.
-
-
----
-
-# Future Improvements
-
-Planned improvements:
-
-- [ ] Add automatic agent deployment
-- [ ] Add backup and restore function
-- [ ] Add Docker deployment option
-- [ ] Improve compatibility testing
-- [ ] Add HA cluster deployment
+- Wazuh does not officially target openSUSE as the primary platform.
+- Some RPM compatibility adjustments are required.
+- Future Wazuh versions may require script updates.
+- Test before production deployment.
 
 
 ---
 
 # Conclusion
 
-This repository provides two approaches for deploying Wazuh on openSUSE Leap 16.
+This repository provides two approaches to deploy Wazuh on openSUSE Leap 16.
 
-For general usage:
-
-```
-Use Ansible Playbook
-```
-
-For testing and debugging:
+Use:
 
 ```
-Use Shell Script
+install-wazuh.sh
 ```
 
-Recommended workflow:
+for first installation and compatibility testing.
+
+
+Use:
 
 ```
-Ansible = Main Installer
-
-Shell Script = Troubleshooting Reference
+install_wazuh_full_opensuse.yml
 ```
 
----
+for automated deployment and long-term management.
 
-# Author
 
-Created for Wazuh deployment experimentation on openSUSE Leap 16.
+Recommended approach:
+
+```
+Shell Script → Validate Installation
+
+Ansible → Manage Deployment
+```
