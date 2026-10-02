@@ -1,0 +1,391 @@
+---
+- name: Install Wazuh Full All-in-One di openSUSE Leap 16
+  hosts: opensuse_wazuh
+  become: true
+
+  vars:
+    wazuh_workdir: /root/wazuh-install
+    wazuh_install_url: https://packages.wazuh.com/4.14/wazuh-install.sh
+    wazuh_admin_user: admin
+    wazuh_admin_password: admin12345
+
+  tasks:
+    - name: Stop service Wazuh lama jika ada
+      ansible.builtin.shell: |
+        systemctl stop wazuh-indexer || true
+        systemctl stop wazuh-manager || true
+        systemctl stop wazuh-dashboard || true
+        systemctl stop filebeat || true
+
+        systemctl disable wazuh-indexer || true
+        systemctl disable wazuh-manager || true
+        systemctl disable wazuh-dashboard || true
+        systemctl disable filebeat || true
+
+        systemctl reset-failed || true
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Hapus paket Wazuh lama
+      ansible.builtin.shell: |
+        rpm -e --nodeps wazuh-indexer || true
+        rpm -e --nodeps wazuh-manager || true
+        rpm -e --nodeps wazuh-dashboard || true
+        rpm -e --nodeps filebeat || true
+        rpm -e --nodeps libcap || true
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Hapus file konfigurasi lama
+      ansible.builtin.shell: |
+        rm -rf /var/ossec
+        rm -rf /etc/wazuh-indexer
+        rm -rf /usr/share/wazuh-indexer
+        rm -rf /var/lib/wazuh-indexer
+        rm -rf /var/log/wazuh-indexer
+
+        rm -rf /etc/wazuh-dashboard
+        rm -rf /usr/share/wazuh-dashboard
+        rm -rf /var/lib/wazuh-dashboard
+        rm -rf /var/log/wazuh-dashboard
+
+        rm -rf /etc/filebeat
+        rm -rf /usr/share/filebeat
+        rm -rf /var/lib/filebeat
+        rm -rf /var/log/filebeat
+
+        rm -rf /root/wazuh-install
+        rm -rf /root/rpmbuild
+        rm -rf /tmp/wazuh-*
+        rm -rf /var/tmp/wazuh-*
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Install dependency dasar openSUSE
+      ansible.builtin.shell: |
+        zypper --non-interactive refresh
+        zypper --non-interactive install \
+          curl bash tar gzip openssl hostname iproute2 systemd \
+          python3 sudo dnf yum firewalld rpm-build libcap2 libcap-progs procps
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Buat folder repo YUM/DNF
+      ansible.builtin.file:
+        path: /etc/yum.repos.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Tambahkan repo openSUSE OSS untuk DNF
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/opensuse-leap-oss.repo
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [opensuse-leap-oss]
+          name=openSUSE Leap 16.0 OSS
+          baseurl=https://download.opensuse.org/distribution/leap/16.0/repo/oss/
+          enabled=1
+          gpgcheck=0
+
+    - name: Tambahkan repo Wazuh untuk DNF
+      ansible.builtin.copy:
+        dest: /etc/yum.repos.d/wazuh.repo
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [wazuh]
+          gpgcheck=0
+          enabled=1
+          name=Wazuh repository
+          baseurl=https://packages.wazuh.com/4.x/yum/
+          protect=1
+
+    - name: Import GPG key Wazuh
+      ansible.builtin.shell: |
+        mkdir -p /etc/pki/rpm-gpg
+        curl -sL https://packages.wazuh.com/key/GPG-KEY-WAZUH -o /etc/pki/rpm-gpg/RPM-GPG-KEY-WAZUH
+        rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-WAZUH || true
+        rpm -qa | grep -i gpg-pubkey || true
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Buat dummy package libcap untuk dependency Wazuh Dashboard
+      ansible.builtin.shell: |
+        rm -rf /root/rpmbuild
+        mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+
+        cat > /root/rpmbuild/SPECS/libcap.spec <<'EOF'
+        Name: libcap
+        Version: 2.66
+        Release: 1
+        Summary: Compatibility package for Wazuh Dashboard on openSUSE
+        License: MIT
+        BuildArch: noarch
+        Requires: libcap2
+        Provides: libcap = 2.66
+
+        %description
+        Compatibility package for Wazuh Dashboard on openSUSE.
+
+        %prep
+
+        %build
+
+        %install
+        mkdir -p %{buildroot}/usr/share/doc/libcap-compat
+        echo "Compatibility package for Wazuh Dashboard" > %{buildroot}/usr/share/doc/libcap-compat/README
+
+        %files
+        /usr/share/doc/libcap-compat/README
+        EOF
+
+        rpmbuild -bb --define "_topdir /root/rpmbuild" /root/rpmbuild/SPECS/libcap.spec
+        rpm -Uvh --replacepkgs --force /root/rpmbuild/RPMS/noarch/libcap-2.66-1.noarch.rpm
+        rpm -q --whatprovides libcap
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Buat dummy systemd-sysv-install untuk openSUSE
+      ansible.builtin.shell: |
+        mkdir -p /usr/lib/systemd
+        cat > /usr/lib/systemd/systemd-sysv-install <<'EOF'
+        #!/bin/sh
+        exit 0
+        EOF
+        chmod +x /usr/lib/systemd/systemd-sysv-install
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Bersihkan cache DNF
+      ansible.builtin.shell: |
+        dnf clean all
+        dnf repolist
+      args:
+        executable: /bin/bash
+      register: dnf_repo
+      changed_when: false
+
+    - name: Tampilkan repo DNF
+      ansible.builtin.debug:
+        var: dnf_repo.stdout_lines
+
+    - name: Buat folder installer Wazuh
+      ansible.builtin.file:
+        path: "{{ wazuh_workdir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Set vm.max_map_count untuk Wazuh Indexer
+      ansible.builtin.copy:
+        dest: /etc/sysctl.d/99-wazuh.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          vm.max_map_count=262144
+
+    - name: Apply sysctl
+      ansible.builtin.command: sysctl --system
+      changed_when: false
+
+    - name: Buka port firewall Wazuh
+      ansible.builtin.shell: |
+        systemctl enable --now firewalld || true
+        firewall-cmd --permanent --add-port=443/tcp || true
+        firewall-cmd --permanent --add-port=1514/tcp || true
+        firewall-cmd --permanent --add-port=1515/tcp || true
+        firewall-cmd --permanent --add-port=55000/tcp || true
+        firewall-cmd --reload || true
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Download installer Wazuh
+      ansible.builtin.get_url:
+        url: "{{ wazuh_install_url }}"
+        dest: "{{ wazuh_workdir }}/wazuh-install.sh"
+        mode: '0755'
+
+    - name: Patch installer agar cocok dengan openSUSE DNF
+      ansible.builtin.shell: |
+        sed -i 's/gpgcheck=1/gpgcheck=0/g' "{{ wazuh_workdir }}/wazuh-install.sh"
+        sed -i 's|gpgkey=https://packages.wazuh.com/key/GPG-KEY-WAZUH||g' "{{ wazuh_workdir }}/wazuh-install.sh"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Jalankan installer Wazuh full all-in-one
+      ansible.builtin.shell: |
+        set -o pipefail
+        cd "{{ wazuh_workdir }}"
+        bash ./wazuh-install.sh -a -o 2>&1 | tee "{{ wazuh_workdir }}/wazuh-install-run.log"
+      args:
+        executable: /bin/bash
+      async: 7200
+      poll: 30
+      register: wazuh_install
+      failed_when: wazuh_install.rc != 0
+
+    - name: Pastikan semua service Wazuh aktif setelah install
+      ansible.builtin.shell: |
+        systemctl daemon-reload
+        systemctl enable wazuh-indexer || true
+        systemctl enable wazuh-manager || true
+        systemctl enable wazuh-dashboard || true
+        systemctl enable filebeat || true
+
+        systemctl restart wazuh-indexer
+        sleep 30
+        systemctl restart wazuh-manager
+        systemctl restart filebeat
+        systemctl restart wazuh-dashboard
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Tunggu Wazuh Indexer siap
+      ansible.builtin.shell: |
+        for i in {1..60}; do
+          if curl -k -s https://localhost:9200 >/dev/null 2>&1; then
+            echo "Wazuh Indexer ready"
+            exit 0
+          fi
+          echo "Menunggu Wazuh Indexer..."
+          sleep 10
+        done
+
+        echo "Wazuh Indexer belum ready"
+        systemctl status wazuh-indexer --no-pager -l || true
+        journalctl -u wazuh-indexer --no-pager -n 80 || true
+        exit 1
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Set password admin dashboard menjadi admin12345
+      ansible.builtin.shell: |
+        export JAVA_HOME=/usr/share/wazuh-indexer/jdk
+        PASS="{{ wazuh_admin_password }}"
+
+        HASH=$(/usr/share/wazuh-indexer/plugins/opensearch-security/tools/hash.sh -p "$PASS" | tail -n 1)
+        export HASH
+
+        cp /etc/wazuh-indexer/opensearch-security/internal_users.yml /root/internal_users.yml.bak.$(date +%s)
+
+        python3 - <<'PY'
+        from pathlib import Path
+        import os
+
+        path = Path("/etc/wazuh-indexer/opensearch-security/internal_users.yml")
+        lines = path.read_text().splitlines()
+
+        inside_admin = False
+        changed = False
+
+        for i, line in enumerate(lines):
+            if line.startswith("admin:"):
+                inside_admin = True
+                continue
+
+            if inside_admin and line and not line.startswith(" ") and not line.startswith("-"):
+                inside_admin = False
+
+            if inside_admin and line.strip().startswith("hash:"):
+                lines[i] = '  hash: "' + os.environ["HASH"] + '"'
+                changed = True
+                break
+
+        if not changed:
+            raise SystemExit("Hash admin tidak ditemukan")
+
+        path.write_text("\n".join(lines) + "\n")
+        PY
+
+        /usr/share/wazuh-indexer/plugins/opensearch-security/tools/securityadmin.sh \
+          -f /etc/wazuh-indexer/opensearch-security/internal_users.yml \
+          -t internalusers \
+          -p 9200 \
+          -nhnv \
+          -cacert /etc/wazuh-indexer/certs/root-ca.pem \
+          -cert /etc/wazuh-indexer/certs/admin.pem \
+          -key /etc/wazuh-indexer/certs/admin-key.pem
+
+        systemctl restart wazuh-dashboard
+
+        cat > "{{ wazuh_workdir }}/custom-login.txt" <<EOF
+        Wazuh Dashboard Login
+        URL      : https://{{ ansible_host }}
+        Username : {{ wazuh_admin_user }}
+        Password : {{ wazuh_admin_password }}
+        EOF
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Tes login admin ke Wazuh Indexer
+      ansible.builtin.shell: |
+        curl -k -u "{{ wazuh_admin_user }}:{{ wazuh_admin_password }}" https://localhost:9200
+      args:
+        executable: /bin/bash
+      register: test_admin_login
+      changed_when: false
+
+    - name: Tampilkan hasil tes login admin
+      ansible.builtin.debug:
+        var: test_admin_login.stdout_lines
+
+    - name: Cek status akhir service
+      ansible.builtin.shell: |
+        echo "wazuh-indexer: $(systemctl is-active wazuh-indexer || true)"
+        echo "wazuh-manager: $(systemctl is-active wazuh-manager || true)"
+        echo "wazuh-dashboard: $(systemctl is-active wazuh-dashboard || true)"
+        echo "filebeat: $(systemctl is-active filebeat || true)"
+      args:
+        executable: /bin/bash
+      register: service_status
+      changed_when: false
+
+    - name: Tampilkan status service
+      ansible.builtin.debug:
+        var: service_status.stdout_lines
+
+    - name: Tampilkan info login dashboard
+      ansible.builtin.shell: |
+        cat "{{ wazuh_workdir }}/custom-login.txt"
+      args:
+        executable: /bin/bash
+      register: login_info
+      changed_when: false
+
+    - name: Output login dashboard
+      ansible.builtin.debug:
+        var: login_info.stdout_lines
+
+    - name: Tampilkan log akhir jika dibutuhkan
+      ansible.builtin.shell: |
+        echo "===== WAZUH INSTALL LOG ====="
+        tail -n 120 "{{ wazuh_workdir }}/wazuh-install-run.log" || true
+        echo "===== SERVICE STATUS ====="
+        systemctl status wazuh-indexer wazuh-manager wazuh-dashboard filebeat --no-pager -l || true
+      args:
+        executable: /bin/bash
+      register: final_log
+      changed_when: false
+
+    - name: Output log akhir
+      ansible.builtin.debug:
+        var: final_log.stdout_lines
