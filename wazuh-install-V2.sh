@@ -8,7 +8,7 @@
 
 
 # =========================
-# PRO UI ENHANCEMENT LAYER
+# UI ENHANCEMENT 
 # =========================
 
 PRO_GREEN="\033[0;32m"
@@ -35,7 +35,7 @@ cat <<'EOF'
 
 ╔══════════════════════════════════════════════╗
 ║                                              ║
-║        WAZUH ALL-IN-ONE INSTALLER            ║
+║        WAZUH AUTOMATED INSTALLER             ║
 ║        openSUSE Leap 16 PRO EDITION          ║
 ║                                              ║
 ║        Automated Security Deployment         ║
