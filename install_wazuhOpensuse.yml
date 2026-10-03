@@ -1,5 +1,5 @@
 ---
-- name: Install Wazuh Full All-in-One di openSUSE Leap 16
+- name: Install Wazuh All-in-One on openSUSE Leap 16
   hosts: opensuse_wazuh
   become: true
 
