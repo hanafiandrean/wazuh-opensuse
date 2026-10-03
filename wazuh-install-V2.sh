@@ -1,61 +1,10 @@
 #!/usr/bin/env bash
 # Standalone Wazuh all-in-one installer for openSUSE Leap 16.0 (x86_64)
 # Compatibility-oriented wrapper around the official Wazuh 4.14 installation assistant.
-#
 # Default behavior is NON-DESTRUCTIVE: if an existing Wazuh installation is detected,
 # this script stops and requires an explicit --force-reinstall.
 
-
-
-# =========================
-# UI ENHANCEMENT 
-# =========================
-
-PRO_GREEN="\033[0;32m"
-PRO_RED="\033[0;31m"
-PRO_YELLOW="\033[1;33m"
-PRO_BLUE="\033[0;34m"
-PRO_CYAN="\033[0;36m"
-PRO_RESET="\033[0m"
-
-pro_ok() {
-    echo -e "${PRO_GREEN}[✓]${PRO_RESET} $*"
-}
-
-pro_warn() {
-    echo -e "${PRO_YELLOW}[!]${PRO_RESET} $*"
-}
-
-pro_info() {
-    echo -e "${PRO_CYAN}[→]${PRO_RESET} $*"
-}
-
-pro_banner() {
-cat <<'EOF'
-
-╔══════════════════════════════════════════════╗
-║                                              ║
-║        WAZUH AUTOMATED INSTALLER             ║
-║        openSUSE Leap 16 PRO EDITION          ║
-║                                              ║
-║        Automated Security Deployment         ║
-║                                              ║
-╚══════════════════════════════════════════════╝
-
-EOF
-}
-
-pro_stage() {
-    echo
-    echo -e "${PRO_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PRO_RESET}"
-    echo -e "${PRO_BLUE}$*${PRO_RESET}"
-    echo -e "${PRO_BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${PRO_RESET}"
-}
-
-
 set -Eeuo pipefail
-
-pro_banner
 umask 077
 
 SCRIPT_NAME="$(basename "$0")"
@@ -69,6 +18,110 @@ IGNORE_HARDWARE=0
 OPEN_API=0
 NO_FIREWALL=0
 USE_OVERWRITE=0
+
+# ============================================================
+# UI LAYER
+# ============================================================
+
+if [[ -t 1 && "${TERM:-dumb}" != "dumb" && -z "${NO_COLOR:-}" ]]; then
+  UI_GREEN='\033[1;32m'
+  UI_RED='\033[1;31m'
+  UI_YELLOW='\033[1;33m'
+  UI_BLUE='\033[1;34m'
+  UI_CYAN='\033[1;36m'
+  UI_WHITE='\033[1;37m'
+  UI_DIM='\033[2m'
+  UI_RESET='\033[0m'
+else
+  UI_GREEN=''
+  UI_RED=''
+  UI_YELLOW=''
+  UI_BLUE=''
+  UI_CYAN=''
+  UI_WHITE=''
+  UI_DIM=''
+  UI_RESET=''
+fi
+
+ui_emit() {
+  local msg="$1"
+  if [[ -w /dev/tty ]]; then
+    printf '%b\n' "$msg" > /dev/tty 2>/dev/null || printf '%b\n' "$msg"
+  else
+    printf '%b\n' "$msg"
+  fi
+}
+
+ui_banner() {
+  printf '%b' "${UI_CYAN}"
+  cat <<'EOF'
+
+ __        __    _    ______   _   _   _   _
+ \ \      / /   / \  |__  /  | | | | | | | |
+  \ \ /\ / /   / _ \   / /   | | | | | |_| |
+   \ V  V /   / ___ \ / /_   | |_| | |  _  |
+    \_/\_/   /_/   \_/____|   \___/  |_| |_|
+
+EOF
+  printf '%b' "${UI_RESET}${UI_BLUE}"
+  cat <<'EOF'
++----------------------------------------------------------------+
+|                  WAZUH AUTOMATED INSTALLER                     |
+|                     openSUSE Leap 16                           |
+|                     ALL-IN-ONE EDITION                         |
++----------------------------------------------------------------+
+EOF
+  printf '%b' "${UI_RESET}"
+  printf '\n'
+  printf '  %-11s : %s\n' 'Platform' 'openSUSE Leap 16.0 x86_64'
+  printf '  %-11s : %s\n' 'Wazuh' '4.14 Series'
+  printf '  %-11s : %s\n' 'Mode' 'All-in-One Deployment'
+  printf '  %-11s : %s\n' 'Project' 'Wazuh openSUSE Deployment Suite'
+  printf '  %-11s : %s\n' 'Author' 'Beanie Berlingham'
+  printf '\n%b\n\n' "${UI_DIM}----------------------------------------------------------------${UI_RESET}"
+}
+
+ui_stage() {
+  local number="$1"
+  shift
+  local title="$*"
+  ui_emit ""
+  ui_emit "${UI_BLUE}+----------------------------------------------------------------+${UI_RESET}"
+  ui_emit "${UI_BLUE}|${UI_RESET} ${UI_CYAN}STAGE ${number}${UI_RESET} :: ${UI_WHITE}${title}${UI_RESET}"
+  ui_emit "${UI_BLUE}+----------------------------------------------------------------+${UI_RESET}"
+}
+
+ui_ok() {
+  ui_emit "${UI_GREEN}[  OK  ]${UI_RESET} $*"
+}
+
+ui_info() {
+  ui_emit "${UI_CYAN}[ INFO ]${UI_RESET} $*"
+}
+
+ui_warn() {
+  ui_emit "${UI_YELLOW}[ WARN ]${UI_RESET} $*"
+}
+
+ui_fail() {
+  ui_emit "${UI_RED}[ FAIL ]${UI_RESET} $*"
+}
+
+ui_success() {
+  ui_emit ""
+  ui_emit "${UI_GREEN}   _____ _   _  ____ ____ _____ ____ ____  ${UI_RESET}"
+  ui_emit "${UI_GREEN}  / ____| | | |/ ___/ ___| ____/ ___/ ___| ${UI_RESET}"
+  ui_emit "${UI_GREEN}  \\___ \\| | | | |  | |   |  _| \\___ \\___ \\ ${UI_RESET}"
+  ui_emit "${UI_GREEN}   ___) | |_| | |__| |___| |___ ___) |__) |${UI_RESET}"
+  ui_emit "${UI_GREEN}  |____/ \\___/ \\____\\____|_____|____/____/ ${UI_RESET}"
+  ui_emit ""
+  ui_emit "${UI_GREEN}+----------------------------------------------------------------+${UI_RESET}"
+  ui_emit "${UI_GREEN}|                 INSTALLATION COMPLETED                       |${UI_RESET}"
+  ui_emit "${UI_GREEN}+----------------------------------------------------------------+${UI_RESET}"
+  ui_emit ""
+}
+
+ui_banner
 
 usage() {
   cat <<USAGE
@@ -102,10 +155,12 @@ log() {
 }
 
 warn() {
+  ui_warn "$*"
   printf '[%s] WARNING: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2
 }
 
 die() {
+  ui_fail "$*"
   printf '[%s] ERROR: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >&2
   exit 1
 }
@@ -190,6 +245,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 log "Starting ${SCRIPT_NAME}"
 log "Log file: ${LOGFILE}"
 
+ui_stage "01" "SYSTEM VALIDATION"
 # ---------- OS / architecture validation ----------
 [[ -r /etc/os-release ]] || die "/etc/os-release not found"
 # shellcheck disable=SC1091
@@ -211,6 +267,7 @@ ARCH="$(uname -m)"
 [[ "$ARCH" == "x86_64" ]] || die "Unsupported architecture '$ARCH'. This installer currently targets x86_64 only."
 
 log "Detected OS: ${PRETTY_NAME:-openSUSE Leap 16.0} (${ARCH})"
+ui_ok "Operating system and architecture validated"
 
 # ---------- Hardware preflight ----------
 CPU_COUNT="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)"
@@ -218,6 +275,7 @@ MEM_MB="$(awk '/MemTotal:/ {printf "%d", $2/1024}' /proc/meminfo 2>/dev/null || 
 ROOT_FREE_MB="$(df -Pm / | awk 'NR==2 {print $4}')"
 
 log "Hardware: CPU=${CPU_COUNT}, RAM=${MEM_MB} MiB, free root disk=${ROOT_FREE_MB} MiB"
+ui_info "CPU=${CPU_COUNT} | RAM=${MEM_MB} MiB | Free disk=${ROOT_FREE_MB} MiB"
 
 if ((CPU_COUNT < 2 || MEM_MB < 3700)); then
   if ((IGNORE_HARDWARE == 0)); then
@@ -230,6 +288,7 @@ if ((CPU_COUNT < 4 || MEM_MB < 7800 || ROOT_FREE_MB < 50000)); then
   warn "System is below Wazuh's recommended quickstart sizing for small deployments (4 vCPU, 8 GiB RAM, 50 GB storage). Installation may still work for a lab."
 fi
 
+ui_stage "02" "INSTALLATION SAFETY CHECK"
 # ---------- Existing installation / reinstall guard ----------
 native_existing=()
 for pkg in wazuh-indexer wazuh-manager wazuh-dashboard filebeat; do
@@ -335,9 +394,11 @@ if ((${#native_existing[@]} > 0 || ${#docker_wazuh_ids[@]} > 0)); then
   fi
 fi
 
+ui_stage "03" "SYSTEM PREPARATION"
 # ---------- Install openSUSE prerequisites ----------
 log "Refreshing openSUSE repositories..."
 zypper --non-interactive refresh
+ui_ok "openSUSE repositories refreshed"
 
 base_packages=(
   bash curl ca-certificates tar gzip openssl hostname iproute2 systemd
@@ -347,6 +408,7 @@ base_packages=(
 
 log "Installing required openSUSE packages..."
 zypper --non-interactive install --no-recommends "${base_packages[@]}"
+ui_ok "Required openSUSE packages are available"
 
 # Wazuh's unattended installer currently expects a yum-style package manager.
 # Leap 16 provides DNF/YUM compatibility packages. Install them without creating
@@ -369,6 +431,7 @@ YUMWRAP
 fi
 
 command -v yum >/dev/null 2>&1 || die "yum compatibility command is still unavailable"
+ui_ok "DNF/YUM compatibility tooling ready"
 
 # The official Wazuh RPM repository writer expects these standard RPM/YUM paths.
 mkdir -p /etc/yum.repos.d /etc/pki/rpm-gpg
@@ -383,11 +446,14 @@ else
   warn "systemd-sysv-install is not present. Continuing because Wazuh central services use native systemd units."
 fi
 
+ui_stage "04" "NETWORK PREFLIGHT"
 # ---------- Network preflight ----------
 log "Checking access to Wazuh package infrastructure..."
 curl --fail --silent --show-error --location --retry 3 --connect-timeout 10 \
   --max-time 30 --range 0-1023 -o /dev/null "$WAZUH_INSTALL_URL"
+ui_ok "Wazuh package infrastructure reachable"
 
+ui_stage "05" "OPENSUSE COMPATIBILITY LAYER"
 # ---------- libcap compatibility ----------
 # Wazuh's RPM dependency scan checks the RPM package name 'libcap'. openSUSE uses
 # the real runtime/tool packages libcap2 and libcap-progs. If rpm -q libcap does
@@ -525,6 +591,7 @@ SPEC
 
 prepare_name_compat procps-ng procps
 prepare_name_compat gnupg2 gpg2
+ui_ok "RPM package-name compatibility layer ready"
 
 # ---------- Kernel setting required by the indexer ----------
 log "Configuring vm.max_map_count..."
@@ -534,6 +601,7 @@ SYSCTL
 chmod 0644 /etc/sysctl.d/99-wazuh.conf
 sysctl -w vm.max_map_count=262144 >/dev/null
 
+ui_stage "06" "PORTS AND FIREWALL PREFLIGHT"
 # ---------- Required-port preflight ----------
 # A previous Wazuh process can remain alive even after its RPM/files have been
 # removed. Only terminate listeners that can be positively identified as Wazuh,
@@ -610,6 +678,7 @@ cleanup_stale_wazuh_listeners() {
 }
 
 cleanup_stale_wazuh_listeners
+ui_ok "Required Wazuh ports passed preflight"
 
 # ---------- Firewall (only if already active) ----------
 configure_firewall() {
@@ -641,6 +710,7 @@ configure_firewall() {
 }
 configure_firewall
 
+ui_stage "07" "WAZUH DEPLOYMENT"
 # ---------- Download official Wazuh installation assistant ----------
 INSTALLER="${WORKDIR}/wazuh-install.sh"
 log "Downloading official Wazuh ${WAZUH_SERIES} installation assistant..."
@@ -648,6 +718,7 @@ curl --fail --silent --show-error --location \
   --retry 5 --retry-delay 2 --retry-all-errors \
   -o "$INSTALLER" "$WAZUH_INSTALL_URL"
 chmod 0700 "$INSTALLER"
+ui_ok "Official Wazuh installation assistant downloaded"
 
 [[ -s "$INSTALLER" ]] || die "Downloaded Wazuh installer is empty"
 head -n 1 "$INSTALLER" | grep -Eq '^#!.*(bash|sh)' || die "Downloaded file does not look like a shell installer"
@@ -701,6 +772,7 @@ if ((USE_OVERWRITE == 1)); then
   log "Native Wazuh installation detected; official overwrite mode (-o) enabled."
 fi
 
+ui_info "Official installer will now deploy Indexer, Manager, Filebeat, and Dashboard"
 log "Launching official Wazuh all-in-one installer..."
 (
   cd "$WORKDIR"
@@ -712,6 +784,7 @@ if [[ -f "$WORKDIR/wazuh-install-files.tar" ]]; then
   chmod 0600 "$WORKDIR/wazuh-install-files.tar"
 fi
 
+ui_stage "08" "POST-INSTALL VALIDATION"
 # ---------- Service boot persistence ----------
 # On Leap 16, systemctl may try the missing systemd-sysv-install helper for
 # Wazuh Indexer/Filebeat even though native unit files exist. First use normal
@@ -873,6 +946,7 @@ if [[ -z "$SERVER_IP" ]]; then
 fi
 SERVER_IP="${SERVER_IP:-127.0.0.1}"
 
+ui_success
 # ---------- Final summary ----------
 printf '\n============================================================\n'
 printf ' WAZUH ALL-IN-ONE INSTALLATION COMPLETED\n'
